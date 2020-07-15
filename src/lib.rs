@@ -1,5 +1,9 @@
 use num_traits::{Num, NumCast};
 
+pub mod err;
+
+type Result<T> = std::result::Result<T, err::ShortError>;
+
 pub static DEFAULT_ALPHABET: &str = "mn6j2c4rv8bpygw95z7hsdaetxuk3fq";
 pub static DEFAULT_BLOCK_SIZE: usize = 24;
 pub static MIN_LENGTH: usize = 5;
@@ -19,15 +23,15 @@ impl UrlEncoder {
         }
     }
 
-    pub fn encode_url<N: Num + NumCast>(&self, n: N, min_length: usize) -> String {
-        return self.enbase(
-            self.encode(NumCast::from(n).expect("number was unable to bet converted to usize")),
+    pub fn encode_url<N: Num + NumCast>(&self, n: N, min_length: usize) -> Result<String> {
+        return Ok(self.enbase(
+            self.encode(NumCast::from(n).ok_or_else(|| err::ShortError::InvalidNumber)?),
             min_length,
-        );
+        ));
     }
 
-    pub fn decode_url(&self, x: String) -> Option<usize> {
-        Some(self.decode(self.debase(x)?))
+    pub fn decode_url(&self, x: String) -> Result<usize> {
+        Ok(self.decode(self.debase(x)?))
     }
 
     fn encode(&self, n: usize) -> usize {
@@ -94,15 +98,20 @@ impl UrlEncoder {
         rt.into_iter().collect()
     }
 
-    fn debase(&self, x: String) -> Option<usize> {
+    fn debase(&self, x: String) -> Result<usize> {
         let n = self.alphabet.len();
         let mut result = 0;
 
-        x.chars().into_iter().rev().enumerate().for_each(|(i, c)| {
-            result += self.alphabet.iter().position(|&x| x == c).unwrap() * (n.pow(i as u32))
-        });
+        for (i, c) in x.chars().into_iter().rev().enumerate() {
+            result += self
+                .alphabet
+                .iter()
+                .position(|&x| x == c)
+                .ok_or_else(|| err::ShortError::InvalidString)?
+                * (n.pow(i as u32))
+        }
 
-        Some(result)
+        Ok(result)
     }
 }
 
@@ -117,7 +126,7 @@ mod tests {
             super::DEFAULT_BLOCK_SIZE,
         );
 
-        assert_eq!(String::from("867nv"), e.encode_url(1, 5));
+        assert_eq!(String::from("867nv"), e.encode_url(1, 5).unwrap());
     }
 
     #[test]
