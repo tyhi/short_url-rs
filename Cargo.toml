@@ -1,8 +1,8 @@
 [package]
 name = "short_url"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Tyler Hill <tyhi@tyhi.rs>"]
-edition = "2018"
+edition = "2021"
 license = "MIT"
 repository = "https://github.com/tyhi/short_url-rs"
 description = "A port of the short_url package in python for Rust"
@@ -10,4 +10,3 @@ homepage = "https://github.com/tyhi/short_url-rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-num-traits = "0.2.12"

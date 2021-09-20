@@ -1,4 +1,4 @@
-use num_traits::{Num, NumCast};
+#![warn(clippy::all, clippy::pedantic, clippy::nursery, clippy::perf)]
 
 pub mod err;
 
@@ -15,28 +15,46 @@ pub struct UrlEncoder {
 }
 
 impl UrlEncoder {
-    pub fn new(alp: String, block: usize) -> Self {
+    /// Creates a new `UrlEncoder` decoder/encoder.
+    ///
+    /// ```
+    /// use short_url::UrlEncoder;
+    ///
+    /// let encoder = UrlEncoder::new("mn6j2c4rv8bpygw95z7hsdaetxuk3fq", 24);
+    /// ```
+    #[must_use]
+    pub fn new(alp: &str, block: usize) -> Self {
         Self {
             alphabet: alp.chars().collect(),
             mask: (1 << block) - 1,
             mapping: (0..block).map(std::convert::From::from).collect(),
         }
     }
+    /// Encodes a number into a string based on the `UrlEncoder`
+    ///
+    /// ```
+    /// use short_url::UrlEncoder;
+    /// let encoder = UrlEncoder::new("mn6j2c4rv8bpygw95z7hsdaetxuk3fq", 24);
+    ///
+    /// assert_eq!(String::from("867nv"), encoder.encode_url(1, 5));
+    /// ```
+    #[must_use]
+    pub fn encode_url(&self, n: usize, min_length: usize) -> String { self.enbase(self.encode(n), min_length) }
 
-    pub fn encode_url<N: Num + NumCast>(&self, n: N, min_length: usize) -> Result<String> {
-        return Ok(self.enbase(
-            self.encode(NumCast::from(n).ok_or_else(|| err::ShortError::InvalidNumber)?),
-            min_length,
-        ));
-    }
+    /// Decodes a string into a`usize`
+    ///
+    ///```
+    /// use short_url::UrlEncoder;
+    /// let e = UrlEncoder::new("mn6j2c4rv8bpygw95z7hsdaetxuk3fq", 24);
+    ///
+    /// assert_eq!(1, e.decode_url("867nv").unwrap());
+    /// ```
+    /// # Errors
+    /// This method will error if the provided string is not valid with the
+    /// alphabet used to construct the `UrlEncoder`
+    pub fn decode_url(&self, x: &str) -> Result<usize> { Ok(self.decode(self.debase(x)?)) }
 
-    pub fn decode_url(&self, x: String) -> Result<usize> {
-        Ok(self.decode(self.debase(x)?))
-    }
-
-    fn encode(&self, n: usize) -> usize {
-        n & !self.mask | self._encode(n & self.mask)
-    }
+    fn encode(&self, n: usize) -> usize { n & !self.mask | self._encode(n & self.mask) }
 
     fn _encode(&self, n: usize) -> usize {
         let mut result = 0;
@@ -50,9 +68,7 @@ impl UrlEncoder {
         result
     }
 
-    fn decode(&self, n: usize) -> usize {
-        (n & !self.mask) | self._decode(n & self.mask)
-    }
+    fn decode(&self, n: usize) -> usize { (n & !self.mask) | self._decode(n & self.mask) }
 
     fn _decode(&self, n: usize) -> usize {
         let mut result = 0;
@@ -69,9 +85,10 @@ impl UrlEncoder {
     fn enbase(&self, x: usize, min_length: usize) -> String {
         let result = self._enbase(x);
 
-        let pad_num = match min_length < result.chars().count() {
-            true => 0,
-            false => min_length - result.chars().count(),
+        let pad_num = if min_length < result.chars().count() {
+            0
+        } else {
+            min_length - result.chars().count()
         };
 
         let padding = self.alphabet[0].to_string().repeat(pad_num);
@@ -85,10 +102,10 @@ impl UrlEncoder {
             return self.alphabet[x].to_string();
         }
 
-        let mut rt: Vec<char> = Vec::new();
+        let mut rt = Vec::new();
         let mut xx = x;
 
-        while !(xx < n) {
+        while xx >= n {
             rt.insert(0, self.alphabet[xx % n]);
             xx /= n;
         }
@@ -98,7 +115,8 @@ impl UrlEncoder {
         rt.into_iter().collect()
     }
 
-    fn debase(&self, x: String) -> Result<usize> {
+    #[allow(clippy::cast_possible_truncation)]
+    fn debase(&self, x: &str) -> Result<usize> {
         let n = self.alphabet.len();
         let mut result = 0;
 
@@ -107,8 +125,8 @@ impl UrlEncoder {
                 .alphabet
                 .iter()
                 .position(|&x| x == c)
-                .ok_or_else(|| err::ShortError::InvalidString)?
-                * (n.pow(i as u32))
+                .ok_or(err::ShortError::InvalidString)?
+                * (n.pow(i as u32));
         }
 
         Ok(result)
@@ -121,21 +139,15 @@ mod tests {
 
     #[test]
     fn encode_url() {
-        let e = UrlEncoder::new(
-            "mn6j2c4rv8bpygw95z7hsdaetxuk3fq".into(),
-            super::DEFAULT_BLOCK_SIZE,
-        );
+        let e = UrlEncoder::new("mn6j2c4rv8bpygw95z7hsdaetxuk3fq", 24);
 
-        assert_eq!(String::from("867nv"), e.encode_url(1, 5).unwrap());
+        assert_eq!(String::from("867nv"), e.encode_url(1, 5));
     }
 
     #[test]
     fn decode_url() {
-        let e = UrlEncoder::new(
-            "mn6j2c4rv8bpygw95z7hsdaetxuk3fq".into(),
-            super::DEFAULT_BLOCK_SIZE,
-        );
+        let e = UrlEncoder::new("mn6j2c4rv8bpygw95z7hsdaetxuk3fq", 24);
 
-        assert_eq!(1, e.decode_url("867nv".into()).unwrap());
+        assert_eq!(1, e.decode_url("867nv").unwrap());
     }
 }
